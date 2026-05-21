@@ -156,7 +156,11 @@ Deploy to Vercel with zero configuration:
 npx vercel
 ```
 
-Set `NEXT_PUBLIC_OPENROUTER_KEY` as an environment variable if you want a default key. Users can also set their own key in the UI.
+| Variable | Required | Purpose |
+|---|---|---|
+| `NEXT_PUBLIC_BMC_USERNAME` | No | Your Buy Me a Coffee username. Set this to show the support button in the header + floating widget. Leave empty (or unset) for forks — zero support UI will render. |
+
+Users provide their own OpenRouter API key in the Settings UI (no env var needed for that).
 
 ---
 

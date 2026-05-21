@@ -32,19 +32,21 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en" className={`${cormorant.variable} ${dmSans.variable} ${ibmPlexMono.variable}`} suppressHydrationWarning>
       <body className="min-h-full">
         {children}
-        <Script
-          src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js"
-          data-name="BMC-Widget"
-          data-cfasync="false"
-          data-id="adarshjaga9"
-          data-description="Support me on Buy me a coffee!"
-          data-message=""
-          data-color="#FF813F"
-          data-position="Right"
-          data-x_margin="18"
-          data-y_margin="18"
-          strategy="lazyOnload"
-        />
+        {process.env.NEXT_PUBLIC_BMC_USERNAME && (
+          <Script
+            src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js"
+            data-name="BMC-Widget"
+            data-cfasync="false"
+            data-id={process.env.NEXT_PUBLIC_BMC_USERNAME}
+            data-description="Support me on Buy me a coffee!"
+            data-message=""
+            data-color="#FF813F"
+            data-position="Right"
+            data-x_margin="18"
+            data-y_margin="18"
+            strategy="lazyOnload"
+          />
+        )}
       </body>
     </html>
   );
