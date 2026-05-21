@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import type { ChatSession } from '@/types'
 import { getAllFiles } from '@/lib/db'
-import { Film, BookOpen, MessageSquare, Plus, Trash2, Coffee, ExternalLink, X } from 'lucide-react'
+import { Film, BookOpen, MessageSquare, Plus, Trash2 } from 'lucide-react'
 
 interface Props {
   activePanel: string
@@ -25,7 +25,6 @@ export default function Sidebar({
   onDeleteSession,
 }: Props) {
   const [fileCount, setFileCount] = useState(0)
-  const [showSupport, setShowSupport] = useState(false)
   const sortedSessions = [...sessions].sort((a, b) => b.updatedAt - a.updatedAt)
 
   useEffect(() => {
@@ -98,64 +97,8 @@ export default function Sidebar({
         </div>
       </div>
 
-      <div className="privacy-footer" style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span>All processing happens locally in your browser.</span>
-          <button
-            onClick={() => setShowSupport(!showSupport)}
-            title="Support this project"
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: '3px',
-              background: 'none', border: 'none', cursor: 'pointer',
-              fontSize: '10px', color: 'var(--muted-foreground)', padding: '2px 4px',
-              borderRadius: '4px', opacity: 0.6,
-            }}
-            onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-            onMouseLeave={e => (e.currentTarget.style.opacity = '0.6')}
-          >
-            <Coffee className="h-3 w-3" /> Support
-          </button>
-        </div>
-        {showSupport && (
-          <div style={{
-            marginTop: '8px', padding: '12px', borderRadius: '8px',
-            background: 'var(--muted)', border: '1px solid var(--border)',
-            display: 'flex', flexDirection: 'column', gap: '8px',
-            fontSize: '11px',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontWeight: 500, fontSize: '11px' }}>Support ARCHIV.</span>
-              <button
-                onClick={() => setShowSupport(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)', padding: 0, display: 'flex' }}
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-              <a
-                href="https://buymeacoffee.com/adarshjaga9"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '5px',
-                  padding: '7px 14px', borderRadius: '6px', textDecoration: 'none',
-                  background: '#FF813F', color: '#fff', fontWeight: 600, fontSize: '12px',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                <Coffee className="h-4 w-4" />
-                Buy me a coffee
-                <ExternalLink className="h-3 w-3" />
-              </a>
-              <img
-                src="/qr-code.png"
-                alt="QR code"
-                style={{ width: '64px', height: '64px', borderRadius: '4px', objectFit: 'cover' }}
-              />
-            </div>
-          </div>
-        )}
+      <div className="privacy-footer">
+        All processing happens locally.
       </div>
     </aside>
   )
