@@ -4,6 +4,9 @@ import { useState, useRef, useEffect } from 'react'
 import { Settings, Coffee, ExternalLink } from 'lucide-react'
 import ThemeToggle from './ThemeToggle'
 
+const AUTO_SHOW_DELAY = 6000
+const RE_SHOW_INTERVAL = 300000
+
 interface Props {
   onSettingsOpen: () => void
   theme: 'light' | 'dark'
@@ -13,6 +16,22 @@ interface Props {
 export default function Header({ onSettingsOpen, theme, onThemeToggle }: Props) {
   const [showSupport, setShowSupport] = useState(false)
   const supportRef = useRef<HTMLDivElement>(null)
+  const hasClickedRef = useRef(false)
+
+  useEffect(() => {
+    const autoTimer = setTimeout(() => {
+      if (!hasClickedRef.current) setShowSupport(true)
+    }, AUTO_SHOW_DELAY)
+
+    const interval = setInterval(() => {
+      if (!hasClickedRef.current) setShowSupport(true)
+    }, RE_SHOW_INTERVAL)
+
+    return () => {
+      clearTimeout(autoTimer)
+      clearInterval(interval)
+    }
+  }, [])
 
   useEffect(() => {
     if (!showSupport) return
@@ -24,6 +43,11 @@ export default function Header({ onSettingsOpen, theme, onThemeToggle }: Props) 
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [showSupport])
+
+  const handleLinkClick = () => {
+    hasClickedRef.current = true
+    setShowSupport(false)
+  }
 
   return (
     <header className="header">
@@ -67,6 +91,7 @@ export default function Header({ onSettingsOpen, theme, onThemeToggle }: Props) 
                 href="https://buymeacoffee.com/adarshjaga9"
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={handleLinkClick}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
                   padding: '9px 0', borderRadius: '8px', textDecoration: 'none',
