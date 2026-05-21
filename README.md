@@ -1,36 +1,185 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Getting Started
-
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+                          █████╗ ██████╗  ██████╗██╗  ██╗██╗██╗   ██╗
+                         ██╔══██╗██╔══██╗██╔════╝██║  ██║██║██║   ██║
+                         ███████║██████╔╝██║     ███████║██║██║   ██║
+                         ██╔══██║██╔══██╗██║     ██╔══██║██║╚██╗ ██╔╝
+                         ██║  ██║██║  ██║╚██████╗██║  ██║██║ ╚████╔╝
+                         ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═══╝
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+<p align="center">
+  <b>Talk to your transcripts. Privately. Offline. Free.</b>
+</p>
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+<p align="center">
+  <a href="#features">Features</a> •
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#how-it-works">How It Works</a> •
+  <a href="#architecture">Architecture</a> •
+  <a href="#deploy">Deploy</a> •
+  <a href="#contributing">Contributing</a>
+</p>
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+<p align="center">
+  <img src="https://img.shields.io/badge/Next.js_16-000000?logo=next.js" alt="Next.js 16">
+  <img src="https://img.shields.io/badge/React_19-61DAFB?logo=react" alt="React 19">
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript" alt="TypeScript">
+  <img src="https://img.shields.io/badge/WebGPU-005A9C?logo=webgpu" alt="WebGPU">
+  <img src="https://img.shields.io/badge/License-MIT-green" alt="MIT">
+</p>
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+**ARCHIV.** is a browser-based RAG (Retrieval-Augmented Generation) application. It lets you download YouTube transcripts, index them locally in your browser, and ask questions using hybrid search + LLM — **no server, no uploads, no API fees for search**.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+> Data never leaves your machine. Only the final LLM call goes to OpenRouter (bring your own free key).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## ✦ Features
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| | |
+|---|---|
+| **🎯 YouTube Downloads** | Paste any video or channel URL. Download transcripts as `.txt` — single or batch (ZIP). |
+| **⚡ Browser-Native RAG** | Embeddings via Transformers.js + WebGPU. Search runs in Web Workers. IndexedDB persistence. |
+| **🔎 Hybrid Search** | Dense vector cosine similarity + BM25 keyword scoring fused via Reciprocal Rank Fusion, then reranked. |
+| **💬 Chat with Citations** | Ask questions. Get answers grounded in your transcripts with source file citations. |
+| **🎛️ Per-Session Context** | Attach specific files to each chat session. Search respects your selection. |
+| **🛑 Halt Mid-Request** | Stop button cancels the LLM call instantly — zero token waste. |
+| **📋 Copy Responses** | One-click copy of formatted markdown responses. |
+| **📊 Live Token Stats** | See tokens used, requests made, and averages per session. |
+| **📄 Prompt Report** | Expand to see the exact system prompt and prompt engineering strategy. |
+| **🗂️ Library Management** | Per-file delete, clear all data, view indexed files. |
+| **🔄 Model Fallback** | Chains through 17 free OpenRouter models automatically. |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## ✦ Quick Start
+
+```bash
+# clone
+git clone https://github.com/AdarshJ173/ARCHIV..git
+cd ARCHIV.
+
+# install
+npm install
+
+# run
+npm run dev
+```
+
+Open `http://localhost:3000`, add your [OpenRouter API key](https://openrouter.ai/keys) in Settings → API Key, and you're ready.
+
+> No OpenRouter key? Grab a free one at [openrouter.ai/keys](https://openrouter.ai/keys). The app uses free models only.
+
+---
+
+## ✦ How It Works
+
+```
+                ┌──────────────────────────────────────┐
+                │         YOUR BROWSER                 │
+                │                                      │
+  YouTube ─────►│  YouTube Downloader                  │
+  URL           │    ↓  .txt files                     │
+                │                                      │
+  .txt / .md ──►│  Chunk Worker (sentence split)       │
+                │    ↓                                 │
+                │  Embed Worker (Transformers.js BGE)  │
+                │    ↓                                 │
+                │  IndexedDB (vectors + BM25 + chunks) │
+                │    ↓                                 │
+  Question ────►│  Search Pipeline:                    │
+                │    • Vector cosine similarity         │
+                │    • BM25 keyword scoring             │
+                │    • RRF fusion + reranker            │
+                │    ↓                                 │
+                │  OpenRouter API (LLM) ───► Answer     │
+                └──────────────────────────────────────┘
+```
+
+**Step by step:**
+
+1. **Download** — Paste a YouTube video or channel URL. Transcripts are fetched and saved as `.txt` files.
+2. **Index** — Upload your `.txt` or `.md` files (or use downloaded transcripts). They're split into chunks, embedded into 768-dim vectors via BGE, and stored in IndexedDB with a BM25 keyword index.
+3. **Chat** — Select which files to use, ask a question. The query is embedded, searched (vector + BM25), fused, reranked, and sent to an LLM with the context. You get a grounded answer with source citations.
+
+---
+
+## ✦ Architecture
+
+```
+web-rag/
+├── src/
+│   ├── app/                   Pages, layouts, API routes
+│   │   └── api/youtube/       Serverless YouTube proxy
+│   ├── components/
+│   │   ├── layout/            Sidebar, Header, Dashboard
+│   │   ├── rag/               Chat, Library, ContextDialog, Settings
+│   │   ├── youtube/           YouTube downloader UI
+│   │   └── ui/                shadcn/ui components
+│   ├── hooks/                 useSearch, useIndex, useSessions, useYouTube
+│   ├── lib/                   Chunker, DB, OpenRouter, BM25, vector-search
+│   ├── workers/               Web Workers for chunking, embedding, search
+│   └── types/                 All TypeScript interfaces
+├── docs/
+│   └── ARCHITECTURE.md        Full product requirements & architecture
+└── package.json
+```
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the complete deep-dive — every component, data flow, API route, and performance target.
+
+---
+
+## ✦ Tech Stack
+
+| Layer | What |
+|---|---|
+| **Framework** | Next.js 16 (App Router) + React 19 |
+| **Language** | TypeScript |
+| **Styling** | Tailwind CSS 4 + shadcn/ui |
+| **Browser ML** | @huggingface/transformers (BGE embeddings via WebGPU) |
+| **Search** | Cosine similarity + BM25 + RRF + Cross-Encoder reranker |
+| **Storage** | IndexedDB (via `idb`) |
+| **LLM** | OpenRouter API (free models) |
+| **Workers** | Web Workers for chunking, embedding, search |
+| **Icons** | lucide-react |
+
+---
+
+## ✦ Deploy
+
+Deploy to Vercel with zero configuration:
+
+```bash
+npx vercel
+```
+
+Set `NEXT_PUBLIC_OPENROUTER_KEY` as an environment variable if you want a default key. Users can also set their own key in the UI.
+
+---
+
+## ✦ Contributing
+
+All contributions are welcome — bugs, features, docs, ideas.
+
+1. Fork it
+2. `git checkout -b feat/your-thing`
+3. Make your changes
+4. `npm run build` to type-check
+5. Open a PR
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for more.
+
+---
+
+## ✦ License
+
+[MIT](LICENSE) — do whatever you want, no warranty.
+
+---
+
+<p align="center">
+  <sub>Built with ❤️ for local, private, free AI.</sub>
+</p>
