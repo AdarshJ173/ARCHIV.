@@ -27,6 +27,7 @@ export default function LibraryPanel() {
     const total = fileList.length
     for (let i = 0; i < total; i++) {
       const file = fileList[i]
+      if (!file) continue
       if (/\.(txt|md)$/i.test(file.name)) {
         const text = await file.text()
         transcriptFiles.push({

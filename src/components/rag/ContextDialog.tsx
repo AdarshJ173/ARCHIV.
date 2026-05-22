@@ -43,7 +43,7 @@ export default function ContextDialog({ open, currentlyAttached, onConfirm, onIn
   }, [])
 
   const handleNewFiles = useCallback((fileList: FileList) => {
-    const valid = Array.from(fileList).filter(f => /\.(txt|md)$/i.test(f.name))
+    const valid = Array.from(fileList).filter(f => f && /\.(txt|md)$/i.test(f.name))
     setNewFiles(prev => {
       const map = new Map(prev.map(f => [f.name, f]))
       for (const f of valid) map.set(f.name, f)
