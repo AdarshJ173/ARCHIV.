@@ -55,15 +55,20 @@ export default function YouTubeDownloader() {
   const [channelVideos, setChannelVideos] = useState<YouTubeChannelVideo[]>([])
   const [channelName, setChannelName] = useState('')
   const [selectedVideos, setSelectedVideos] = useState<Set<string>>(new Set())
-  const [fetchStatuses, setFetchStatuses] = useState<Record<string, VideoFetchInfo>>({})
   const [batchStartTime, setBatchStartTime] = useState(0)
   const [batchComplete, setBatchComplete] = useState(false)
   const [showTranscripts, setShowTranscripts] = useState(true)
   const [eta, setEta] = useState<string | null>(null)
-  const { getTranscript, getChannelVideos: fetchChannel, fetchTranscriptsBatch, cancelBatch, fetching, error, batchActive } = useYouTube()
+  const { getTranscript, getChannelVideos: fetchChannel, fetchTranscriptsBatch, cancelBatch, fetching, error, batchActive, batchResults } = useYouTube()
   const { settings } = useSettings()
 
   const urlType = getUrlType(url)
+
+  const fetchStatuses = useMemo(() => {
+    const record: Record<string, VideoFetchInfo> = {}
+    for (const r of batchResults) record[r.videoId] = r
+    return record
+  }, [batchResults])
 
   const handleSubmit = async () => {
     const trimmed = url.trim()
@@ -71,7 +76,6 @@ export default function YouTubeDownloader() {
     if (isChannelUrl(trimmed)) {
       setMode('channel')
       setSingleResult(null)
-      setFetchStatuses({})
       setBatchComplete(false)
       const result = await fetchChannel(trimmed, settings.youtubeDataKey)
       if (result) {
@@ -84,7 +88,6 @@ export default function YouTubeDownloader() {
       if (!videoId) return
       setMode('single')
       setChannelVideos([])
-      setFetchStatuses({})
       setBatchComplete(false)
       const result = await getTranscript(videoId)
       if (result) setSingleResult(result)
@@ -101,7 +104,7 @@ export default function YouTubeDownloader() {
     a.href = URL.createObjectURL(blob)
     a.download = filename
     a.click()
-    URL.revokeObjectURL(a.href)
+    setTimeout(() => URL.revokeObjectURL(a.href), 500)
   }
 
   const getDownloadableResults = useCallback(() => {
@@ -128,7 +131,7 @@ export default function YouTubeDownloader() {
     a.href = URL.createObjectURL(blob)
     a.download = `${channelName.replace(/[^a-zA-Z0-9_-\s]/g, '')}_transcripts.zip`
     a.click()
-    URL.revokeObjectURL(a.href)
+    setTimeout(() => URL.revokeObjectURL(a.href), 500)
   }, [getDownloadableResults, channelName])
 
   const startBatchFetch = async () => {
@@ -136,7 +139,6 @@ export default function YouTubeDownloader() {
     if (selected.length === 0) return
     setBatchComplete(false)
     setBatchStartTime(Date.now())
-    setFetchStatuses({})
     await fetchTranscriptsBatch(selected.map(v => v.id), { concurrency: 10, maxRetries: 3 })
     setBatchComplete(true)
   }
