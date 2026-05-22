@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useRef, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -82,17 +82,75 @@ export default function ChatInterface({ messages, onSend, searching, onStop, att
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       {hasContext ? (
         <div style={{
-          display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap',
-          padding: '6px 16px', borderBottom: '1px solid var(--border)',
-          background: 'rgba(45, 107, 63, 0.04)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          padding: '8px 16px',
+          borderBottom: '1px solid var(--border)',
+          background: 'rgba(45, 107, 63, 0.06)',
+          minHeight: '44px',
+          flexShrink: 0,
         }}>
-          <FileText className="h-3 w-3" style={{ color: 'var(--success)' }} />
-          <span style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>Context:</span>
-          {attachedFiles.map((f, i) => (
-            <span key={i} className="source-badge">
-              {f}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+            <FileText className="h-3.5 w-3.5" style={{ color: 'var(--success)' }} />
+            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--foreground)' }}>
+              Context ({attachedFiles.length} file{attachedFiles.length !== 1 ? 's' : ''}):
             </span>
-          ))}
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              overflowX: 'auto',
+              flex: 1,
+              whiteSpace: 'nowrap',
+              paddingBottom: '2px',
+            }}
+          >
+            {attachedFiles.map((f, i) => (
+              <span
+                key={i}
+                className="source-badge"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '11px',
+                  padding: '3px 8px',
+                  background: 'var(--background)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '4px',
+                  color: 'var(--foreground)',
+                  flexShrink: 0,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <FileText className="h-3 w-3 opacity-60" />
+                {f}
+              </span>
+            ))}
+          </div>
+
+          <button
+            onClick={onAttachContext}
+            style={{
+              fontSize: '11px',
+              padding: '4px 10px',
+              borderRadius: '4px',
+              background: 'var(--accent)',
+              color: 'var(--accent-foreground)',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 500,
+              flexShrink: 0,
+              transition: 'all 0.15s ease',
+            }}
+            className="hover-bright"
+          >
+            Manage
+          </button>
         </div>
       ) : (
         <div style={{

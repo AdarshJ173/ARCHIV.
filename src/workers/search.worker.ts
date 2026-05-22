@@ -116,7 +116,14 @@ let rerankerInstance: any = null
 async function getReranker() {
   if (rerankerInstance) return rerankerInstance
 
-  const { pipeline } = await import('@huggingface/transformers')
+  const { pipeline, env } = await import('@huggingface/transformers')
+
+  // Prioritize Discrete GPU (dGPU) if available, falling back to Integrated GPU (iGPU) and then WASM (CPU)
+  if (env.backends?.onnx?.wasm) {
+    (env.backends.onnx.wasm as any).webgpu = {
+      powerPreference: 'high-performance'
+    }
+  }
   
   self.postMessage({ type: 'rerank-model-load', status: 'loading' })
   const t = performance.now()

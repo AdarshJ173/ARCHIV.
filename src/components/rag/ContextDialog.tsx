@@ -42,6 +42,23 @@ export default function ContextDialog({ open, currentlyAttached, onConfirm, onIn
     })
   }, [])
 
+  const handleSelectAll = useCallback(() => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      const allSelected = indexedFiles.every(f => next.has(f.name))
+      if (allSelected) {
+        for (const f of indexedFiles) {
+          next.delete(f.name)
+        }
+      } else {
+        for (const f of indexedFiles) {
+          next.add(f.name)
+        }
+      }
+      return next
+    })
+  }, [indexedFiles])
+
   const handleNewFiles = useCallback((fileList: FileList) => {
     const valid = Array.from(fileList).filter(f => f && /\.(txt|md)$/i.test(f.name))
     setNewFiles(prev => {
@@ -135,9 +152,31 @@ export default function ContextDialog({ open, currentlyAttached, onConfirm, onIn
           )}
 
           <div className="settings-section">
-            <div className="settings-section-title" style={{ fontSize: '12px', marginBottom: '8px' }}>
-              <FileText className="h-3.5 w-3.5" />
-              Previously Indexed
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <div className="settings-section-title" style={{ fontSize: '12px', margin: 0 }}>
+                <FileText className="h-3.5 w-3.5" />
+                Previously Indexed
+              </div>
+              {!loading && indexedFiles.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleSelectAll}
+                  style={{
+                    fontSize: '11px',
+                    color: 'var(--accent)',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    transition: 'all 0.2s ease',
+                  }}
+                  className="hover-bright"
+                >
+                  {indexedFiles.every(f => selected.has(f.name)) ? 'Deselect All' : 'Select All'}
+                </button>
+              )}
             </div>
 
             {loading ? (

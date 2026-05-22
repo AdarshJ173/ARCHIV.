@@ -13,7 +13,14 @@ async function getEmbedder() {
     return embedder
   }
 
-  const { pipeline } = await import('@huggingface/transformers')
+  const { pipeline, env } = await import('@huggingface/transformers')
+
+  // Prioritize Discrete GPU (dGPU) if available, falling back to Integrated GPU (iGPU) and then WASM (CPU)
+  if (env.backends?.onnx?.wasm) {
+    (env.backends.onnx.wasm as any).webgpu = {
+      powerPreference: 'high-performance'
+    }
+  }
 
   const t = performance.now()
   self.postMessage({ type: 'model-download', model: 'Xenova/bge-base-en-v1.5', dtype: 'q8', status: 'loading' })
