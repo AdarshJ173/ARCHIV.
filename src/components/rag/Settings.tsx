@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSettings } from '@/hooks/useSettings'
 import { Key, X, ExternalLink, Eye, EyeOff } from 'lucide-react'
 
@@ -32,10 +32,14 @@ interface Props {
 }
 
 export default function SettingsDialog({ onClose }: Props) {
-  const { settings, setSettings } = useSettings()
+  const { settings, setSettings, loaded } = useSettings()
   const [local, setLocal] = useState({ ...settings })
   const [showKey, setShowKey] = useState(false)
   const [showYtKey, setShowYtKey] = useState(false)
+
+  useEffect(() => {
+    if (loaded) setLocal({ ...settings })
+  }, [loaded])
 
   const handleSave = () => {
     setSettings(local)
