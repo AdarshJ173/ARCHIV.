@@ -19,27 +19,48 @@ export function useIndex() {
     console.log(`[WebRAG] INDEXING STARTED: ${files.length} files`)
     console.log(`[WebRAG] Files:`, files.map(f => `${f.name} (${(f.size / 1024).toFixed(1)} KB)`).join(', '))
 
-    let t = performance.now()
-    console.log(`[WebRAG] Step 1/5: Saving files to IndexedDB (0%) [elapsed: 0ms]`)
-    setState({ status: 'indexing', totalFiles: files.length, totalChunks: 0, progress: 0, message: 'Saving files...' })
-    await saveFiles(files)
-    console.log(`[WebRAG] Step 1/5: Complete - ${files.length} files saved [+${(performance.now()-t).toFixed(0)}ms]`)
-
-    t = performance.now()
-    console.log(`[WebRAG] Step 2/5: Chunking files... (10%)`)
-    setState(prev => ({ ...prev, progress: 10, message: 'Chunking files...' }))
-    const chunkInputs = files.map(f => ({ id: f.id, text: f.text, fileName: f.name }))
-    const chunks = chunkFiles(chunkInputs, { maxTokens: options?.chunkSize })
-    await saveChunks(chunks)
-    console.log(`[WebRAG] Step 2/5: Complete - ${chunks.length} chunks [+${(performance.now()-t).toFixed(0)}ms] [total: ${(performance.now()-tStart).toFixed(0)}ms]`)
-
-    setState(prev => ({ ...prev, totalChunks: chunks.length, progress: 15, message: 'Embedding chunks...' }))
+    const indexWorker = new Worker(new URL('@/workers/index.worker', import.meta.url))
 
     try {
+      let t = performance.now()
+      console.log(`[WebRAG] Step 1/5: Saving files to IndexedDB (0%) [elapsed: 0ms]`)
+      setState({ status: 'indexing', totalFiles: files.length, totalChunks: 0, progress: 0, message: 'Saving files...' })
+      await saveFiles(files)
+      console.log(`[WebRAG] Step 1/5: Complete - ${files.length} files saved [+${(performance.now()-t).toFixed(0)}ms]`)
+
+      t = performance.now()
+      console.log(`[WebRAG] Step 2/5: Chunking files in background worker... (10%)`)
+      setState(prev => ({ ...prev, progress: 10, message: 'Chunking files...' }))
+      const chunkInputs = files.map(f => ({ id: f.id, text: f.text, fileName: f.name }))
+      
+      const chunks = await new Promise<Chunk[]>((resolve, reject) => {
+        indexWorker.onmessage = (e) => {
+          const { type, chunks, error } = e.data
+          if (type === 'chunk-complete') {
+            resolve(chunks)
+          } else if (type === 'error') {
+            reject(new Error(error))
+          }
+        }
+        indexWorker.onerror = (err) => {
+          reject(err)
+        }
+        indexWorker.postMessage({
+          type: 'chunk',
+          files: chunkInputs,
+          options: { maxTokens: options?.chunkSize }
+        })
+      })
+
+      await saveChunks(chunks)
+      console.log(`[WebRAG] Step 2/5: Complete - ${chunks.length} chunks [+${(performance.now()-t).toFixed(0)}ms] [total: ${(performance.now()-tStart).toFixed(0)}ms]`)
+
+      setState(prev => ({ ...prev, totalChunks: chunks.length, progress: 15, message: 'Embedding chunks...' }))
+
       t = performance.now()
       console.log(`[WebRAG] Step 3/5: Starting embedding process (15%)`)
       console.log(`[WebRAG]   Model: Xenova/bge-base-en-v1.5 (768-dim)`)
-      console.log(`[WebRAG]   Chunks: ${chunks.length}, Batch size: 16`)
+      console.log(`[WebRAG]   Chunks: ${chunks.length}`)
 
       const embedWorker = new Worker(new URL('@/workers/embed.worker', import.meta.url))
 
@@ -80,17 +101,32 @@ export function useIndex() {
       })
 
       t = performance.now()
-      console.log(`[WebRAG] Step 4/5: Building BM25 index (65%)`)
+      console.log(`[WebRAG] Step 4/5: Building BM25 index in background worker (65%)`)
       setState(prev => ({ ...prev, progress: 65, message: 'Building BM25 index...' }))
 
       const allChunks = await getAllChunks()
       console.log(`[WebRAG]   Tokenizing ${allChunks.length} chunks for BM25...`)
-      const bm25Index = buildBm25Index(allChunks.map(c => ({ id: c.id, text: c.text })))
-      console.log(`[WebRAG]   BM25 index built: ${bm25Index.termFreqs.size} unique terms across ${allChunks.length} docs [+${(performance.now()-t).toFixed(0)}ms]`)
+      
+      const terms = await new Promise<any[]>((resolve, reject) => {
+        indexWorker.onmessage = (e) => {
+          const { type, terms, error } = e.data
+          if (type === 'bm25-complete') {
+            resolve(terms)
+          } else if (type === 'error') {
+            reject(new Error(error))
+          }
+        }
+        indexWorker.onerror = (err) => {
+          reject(err)
+        }
+        indexWorker.postMessage({
+          type: 'bm25',
+          chunks: allChunks.map(c => ({ id: c.id, text: c.text }))
+        })
+      })
 
       t = performance.now()
       console.log(`[WebRAG]   Saving BM25 terms to IndexedDB...`)
-      const terms = bm25IndexToTerms(bm25Index)
       await saveBm25Terms(terms)
       console.log(`[WebRAG]   BM25 terms saved [+${(performance.now()-t).toFixed(0)}ms]`)
       console.log(`[WebRAG] Step 4/5: BM25 complete [total: ${(performance.now()-tStart).toFixed(0)}ms]`)
@@ -127,6 +163,8 @@ export function useIndex() {
         status: 'error',
         message: err instanceof Error ? err.message : 'Indexing failed',
       }))
+    } finally {
+      indexWorker.terminate()
     }
   }, [])
 
@@ -138,8 +176,25 @@ export function useIndex() {
 
     const remainingChunks = await getAllChunks()
     if (remainingChunks.length > 0) {
-      const bm25Index = buildBm25Index(remainingChunks.map(c => ({ id: c.id, text: c.text })))
-      await saveBm25Terms(bm25IndexToTerms(bm25Index))
+      const tempWorker = new Worker(new URL('@/workers/index.worker', import.meta.url))
+      try {
+        const terms = await new Promise<any[]>((resolve, reject) => {
+          tempWorker.onmessage = (e) => {
+            if (e.data.type === 'bm25-complete') resolve(e.data.terms)
+            else if (e.data.type === 'error') reject(new Error(e.data.error))
+          }
+          tempWorker.onerror = reject
+          tempWorker.postMessage({
+            type: 'bm25',
+            chunks: remainingChunks.map(c => ({ id: c.id, text: c.text }))
+          })
+        })
+        await saveBm25Terms(terms)
+      } catch (err) {
+        console.error(`[WebRAG] Failed to build BM25 after delete in background:`, err)
+      } finally {
+        tempWorker.terminate()
+      }
     } else {
       await clearBm25()
     }

@@ -1,8 +1,9 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect } from 'react'
 import { useSettings } from '@/hooks/useSettings'
-import { Key, X, ExternalLink, Eye, EyeOff } from 'lucide-react'
+import { Key, X, ExternalLink, Eye, EyeOff, Cpu, Zap, Cpu as GpuIcon } from 'lucide-react'
+import { getSystemSpecs, type SystemSpecs } from '@/lib/system'
 
 const models = [
   { id: 'openrouter/free', name: 'Auto: Best Free Model' },
@@ -36,10 +37,15 @@ export default function SettingsDialog({ onClose }: Props) {
   const [local, setLocal] = useState({ ...settings })
   const [showKey, setShowKey] = useState(false)
   const [showYtKey, setShowYtKey] = useState(false)
+  const [specs, setSpecs] = useState<SystemSpecs | null>(null)
 
   useEffect(() => {
     if (loaded) setLocal({ ...settings })
   }, [loaded])
+
+  useEffect(() => {
+    setSpecs(getSystemSpecs())
+  }, [])
 
   const handleSave = () => {
     setSettings(local)
@@ -187,6 +193,69 @@ export default function SettingsDialog({ onClose }: Props) {
               <div className="settings-hint">Characters per chunk (128-2048)</div>
             </div>
           </div>
+
+          {specs && (
+            <div className="settings-section" style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', marginTop: '16px' }}>
+              <div className="settings-section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Zap className="h-4 w-4" style={{ color: 'var(--accent)' }} />
+                  Hardware Optimization Status
+                </div>
+                <span
+                  style={{
+                    fontSize: '10px',
+                    padding: '2px 8px',
+                    borderRadius: '9999px',
+                    background: specs.webgpuSupported ? 'rgba(45, 107, 63, 0.15)' : 'rgba(154, 123, 47, 0.15)',
+                    color: specs.webgpuSupported ? 'var(--success)' : 'var(--warning)',
+                    fontWeight: 600,
+                  }}
+                >
+                  {specs.webgpuSupported ? 'WebGPU Priority Active' : 'WASM Active'}
+                </span>
+              </div>
+              <div className="settings-section-desc">
+                Your system capabilities are diagnosed locally. ARCHIV. automatically schedules and routes model inference pipelines to your highest-performance hardware.
+              </div>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '8px',
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '6px',
+                  padding: '12px',
+                  fontSize: '11px',
+                }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
+                  <div style={{ color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <GpuIcon className="h-3 w-3" /> Graphics Hardware
+                  </div>
+                  <div style={{ fontWeight: 600, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={specs.gpuRenderer}>
+                    {specs.gpuRenderer !== 'Unknown' ? specs.gpuRenderer : 'Standard Renderer'}
+                  </div>
+                  <div style={{ fontSize: '10px', color: specs.gpuType === 'Discrete GPU' ? 'var(--success)' : 'var(--muted-foreground)' }}>
+                    Type: <span style={{ fontWeight: 600 }}>{specs.gpuType}</span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
+                  <div style={{ color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Cpu className="h-3 w-3" /> CPU & Memory
+                  </div>
+                  <div style={{ fontWeight: 600, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                    {specs.cpuCores} Cores / {specs.deviceMemory}
+                  </div>
+                  <div style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>
+                    Driver: <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{specs.activeDriver}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="modal-footer">
