@@ -72,15 +72,19 @@ export default function ContextDialog({ open, currentlyAttached, onConfirm, onIn
 
     const newProcessed: TranscriptFile[] = []
     for (const f of newFiles) {
-      const text = await f.text()
-      newProcessed.push({
-        id: `ctx_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        name: f.name,
-        text,
-        size: f.size,
-        uploadedAt: Date.now(),
-      })
-      allFileNames.add(f.name)
+      try {
+        const text = await f.text()
+        newProcessed.push({
+          id: `ctx_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          name: f.name,
+          text,
+          size: f.size,
+          uploadedAt: Date.now(),
+        })
+        allFileNames.add(f.name)
+      } catch (err) {
+        console.warn(`[WebRAG] Failed to read context file ${f.name}:`, err)
+      }
     }
 
     if (allFileNames.size === 0) return

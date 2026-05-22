@@ -29,14 +29,18 @@ export default function LibraryPanel() {
       const file = fileList[i]
       if (!file) continue
       if (/\.(txt|md)$/i.test(file.name)) {
-        const text = await file.text()
-        transcriptFiles.push({
-          id: `${Date.now()}_${i}`,
-          name: file.webkitRelativePath || file.name,
-          text,
-          size: file.size,
-          uploadedAt: Date.now(),
-        })
+        try {
+          const text = await file.text()
+          transcriptFiles.push({
+            id: `${Date.now()}_${i}`,
+            name: file.webkitRelativePath || file.name,
+            text,
+            size: file.size,
+            uploadedAt: Date.now(),
+          })
+        } catch (err) {
+          console.warn(`[WebRAG] Failed to read file ${file.name}:`, err)
+        }
       }
     }
     if (transcriptFiles.length === 0) return
