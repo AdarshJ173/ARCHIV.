@@ -139,7 +139,7 @@ export default function YouTubeDownloader() {
     if (selected.length === 0) return
     setBatchComplete(false)
     setBatchStartTime(Date.now())
-    await fetchTranscriptsBatch(selected.map(v => v.id), { concurrency: 10, maxRetries: 3 })
+    await fetchTranscriptsBatch(selected.map(v => v.id), { concurrency: 3, maxRetries: 3 })
     setBatchComplete(true)
   }
 

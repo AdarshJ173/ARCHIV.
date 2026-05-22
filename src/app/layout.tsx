@@ -26,10 +26,7 @@ export const metadata: Metadata = {
   title: "ARCHIV. — Transcript Intelligence",
   description: "Download YouTube transcripts, build a local knowledge library, and chat with your documents using in-browser AI.",
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://archiv.vercel.app"),
-  icons: [
-    { rel: "icon", url: "/favicon.png", type: "image/png" },
-    { rel: "icon", url: "/favicon.svg", type: "image/svg+xml" },
-  ],
+  icons: [{ rel: "icon", url: "/favicon.png", type: "image/png" }],
   openGraph: {
     title: "ARCHIV. — Transcript Intelligence",
     description: "Download YouTube transcripts, build a local knowledge library, and chat with your documents using in-browser AI.",

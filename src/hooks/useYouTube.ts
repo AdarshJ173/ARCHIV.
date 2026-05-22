@@ -67,7 +67,7 @@ export function useYouTube() {
       maxRetries?: number
     } = {}
   ): Promise<VideoFetchInfo[]> => {
-    const { concurrency = 10, maxRetries = 3 } = options
+    const { concurrency = 3, maxRetries = 3 } = options
 
     abortRef.current = new AbortController()
     const signal = abortRef.current.signal
@@ -90,6 +90,9 @@ export function useYouTube() {
 
         results[idx].status = 'fetching'
         setBatchResults([...results])
+
+        // small delay between requests per worker to avoid rate limiting
+        await new Promise(r => setTimeout(r, 800))
 
         let lastError: string | undefined
         for (let attempt = 1; attempt <= maxRetries; attempt++) {

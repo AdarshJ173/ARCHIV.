@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 interface Settings {
   openrouterKey: string
@@ -11,7 +11,7 @@ interface Settings {
 const STORAGE_KEY = 'webrag-settings'
 const DEFAULT: Settings = {
   openrouterKey: process.env.NEXT_PUBLIC_OPENROUTER_KEY || '',
-  youtubeDataKey: '',
+  youtubeDataKey: process.env.NEXT_PUBLIC_YOUTUBE_DATA_API_KEY || 'AIzaSyBOCe23nKICUkhoUVSC8jh9KieK8VTs6gc',
   model: 'openai/gpt-4o-mini',
   topK: 5,
   chunkSize: 512,
