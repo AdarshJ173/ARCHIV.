@@ -111,24 +111,51 @@ self.onmessage = async (e: MessageEvent<SearchInput | RerankInput>) => {
   self.postMessage({ type: 'search', results: final })
 }
 
+let rerankerInstance: any = null
+
+async function getReranker() {
+  if (rerankerInstance) return rerankerInstance
+
+  const { pipeline } = await import('@huggingface/transformers')
+  
+  self.postMessage({ type: 'rerank-model-load', status: 'loading' })
+  const t = performance.now()
+
+  try {
+    if (typeof navigator !== 'undefined' && 'gpu' in navigator) {
+      console.log('[WebRAG:Worker] Attempting WebGPU initialization for Reranker...')
+      rerankerInstance = await pipeline('text-classification', 'Xenova/bge-reranker-base', {
+        device: 'webgpu',
+      })
+      console.log('[WebRAG:Worker] WebGPU Reranker loaded successfully.')
+    } else {
+      throw new Error('WebGPU not supported in this environment')
+    }
+  } catch (webgpuError) {
+    console.warn('[WebRAG:Worker] WebGPU Reranker failed or unsupported, falling back to WASM/CPU:', webgpuError)
+    try {
+      rerankerInstance = await pipeline('text-classification', 'Xenova/bge-reranker-base', {
+        device: 'wasm',
+        dtype: 'q8',
+      })
+    } catch {
+      rerankerInstance = await pipeline('text-classification', 'Xenova/bge-reranker-base')
+    }
+  }
+
+  console.log(`[WebRAG:Worker] Reranker model loaded in ${(performance.now()-t).toFixed(0)}ms`)
+  self.postMessage({ type: 'rerank-model-load', status: 'ready' })
+  return rerankerInstance
+}
+
 async function runReranker(
   query: string,
   pairs: Array<{ id: string; text: string; source: string }>
 ): Promise<Array<{ id: string; text: string; source: string; score: number }>> {
   try {
-    const { pipeline } = await import('@huggingface/transformers')
+    const reranker = await getReranker()
 
-    let t = performance.now()
-    self.postMessage({ type: 'rerank-model-load', status: 'loading' })
-
-    const reranker = await pipeline('text-classification', 'Xenova/bge-reranker-base', {
-      dtype: 'q8',
-    })
-
-    console.log(`[WebRAG:Worker] Reranker model loaded in ${(performance.now()-t).toFixed(0)}ms`)
-    self.postMessage({ type: 'rerank-model-load', status: 'ready' })
-
-    t = performance.now()
+    const t = performance.now()
     const scored = await Promise.all(
       pairs.map(async (pair) => {
         const result = await reranker(`${query} [SEP] ${pair.text}`)
@@ -139,8 +166,9 @@ async function runReranker(
     console.log(`[WebRAG:Worker] Cross-encoder scored ${pairs.length} pairs in ${(performance.now()-t).toFixed(0)}ms`)
 
     return scored.sort((a, b) => b.score - a.score)
-  } catch {
-    console.warn(`[WebRAG:Worker] Cross-encoder failed, falling back to rank-based scoring`)
+  } catch (err) {
+    console.warn(`[WebRAG:Worker] Cross-encoder failed, falling back to rank-based scoring:`, err)
     return pairs.map((p, i) => ({ ...p, score: pairs.length - i }))
   }
 }
+

@@ -6,6 +6,7 @@ interface EmbedInput {
 }
 
 let embedder: any = null
+let isWebGPUActive = false
 
 async function getEmbedder() {
   if (embedder) {
@@ -18,11 +19,27 @@ async function getEmbedder() {
   self.postMessage({ type: 'model-download', model: 'Xenova/bge-base-en-v1.5', dtype: 'q8', status: 'loading' })
 
   try {
-    embedder = await pipeline('feature-extraction', 'Xenova/bge-base-en-v1.5', {
-      dtype: 'q8',
-    })
-  } catch {
-    embedder = await pipeline('feature-extraction', 'Xenova/bge-base-en-v1.5')
+    if (typeof navigator !== 'undefined' && 'gpu' in navigator) {
+      console.log('[WebRAG:Worker] Attempting WebGPU initialization for BGE model...')
+      embedder = await pipeline('feature-extraction', 'Xenova/bge-base-en-v1.5', {
+        device: 'webgpu',
+      })
+      isWebGPUActive = true
+      console.log('[WebRAG:Worker] WebGPU BGE model loaded successfully.')
+    } else {
+      throw new Error('WebGPU not supported in this environment')
+    }
+  } catch (webgpuError) {
+    console.warn('[WebRAG:Worker] WebGPU failed or unsupported, falling back to WASM/CPU:', webgpuError)
+    isWebGPUActive = false
+    try {
+      embedder = await pipeline('feature-extraction', 'Xenova/bge-base-en-v1.5', {
+        device: 'wasm',
+        dtype: 'q8',
+      })
+    } catch {
+      embedder = await pipeline('feature-extraction', 'Xenova/bge-base-en-v1.5')
+    }
   }
 
   console.log(`[WebRAG:Worker] BGE model loaded in ${(performance.now()-t).toFixed(0)}ms`)
@@ -37,9 +54,10 @@ self.onmessage = async (e: MessageEvent<EmbedInput>) => {
   try {
     const extractor = await getEmbedder()
 
-    const batchSize = 16
+    const batchSize = isWebGPUActive ? 64 : 16
     const allEmbeddings: Array<{ id: string; embedding: number[] }> = []
     const batchTimes: number[] = []
+
 
     for (let i = 0; i < chunks.length; i += batchSize) {
       const tBatch = performance.now()
