@@ -71,11 +71,11 @@ export default function ContextDialog({ open, currentlyAttached, onConfirm, onIn
     const allFileNames = new Set(selected)
 
     const newProcessed: TranscriptFile[] = []
-    for (const f of newFiles) {
+    const tasks = newFiles.map(async (f, idx) => {
       try {
         const text = await f.text()
         newProcessed.push({
-          id: `ctx_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          id: `ctx_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 8)}`,
           name: f.name,
           text,
           size: f.size,
@@ -85,7 +85,8 @@ export default function ContextDialog({ open, currentlyAttached, onConfirm, onIn
       } catch (err) {
         console.warn(`[WebRAG] Failed to read context file ${f.name}:`, err)
       }
-    }
+    })
+    await Promise.all(tasks)
 
     if (allFileNames.size === 0) return
 

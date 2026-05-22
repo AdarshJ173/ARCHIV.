@@ -23,16 +23,17 @@ export default function LibraryPanel() {
   useEffect(() => { const t = setTimeout(() => loadFiles(), 0); return () => clearTimeout(t) }, [loadFiles])
 
   const processFiles = useCallback(async (fileList: FileList) => {
+    console.log(`[WebRAG] processFiles: Received ${fileList.length} files`)
     const transcriptFiles: TranscriptFile[] = []
     const total = fileList.length
-    for (let i = 0; i < total; i++) {
-      const file = fileList[i]
-      if (!file) continue
-      if (/\.(txt|md)$/i.test(file.name)) {
+    
+    const tasks = Array.from(fileList).map(async (file, i) => {
+      if (!file) return
+      if (/\.(txt|md|text|markdown)$/i.test(file.name)) {
         try {
           const text = await file.text()
           transcriptFiles.push({
-            id: `${Date.now()}_${i}`,
+            id: `file_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}`,
             name: file.webkitRelativePath || file.name,
             text,
             size: file.size,
@@ -42,15 +43,20 @@ export default function LibraryPanel() {
           console.warn(`[WebRAG] Failed to read file ${file.name}:`, err)
         }
       }
-    }
+    })
+    
+    await Promise.all(tasks)
+    
+    console.log(`[WebRAG] processFiles: Successfully read ${transcriptFiles.length} valid files`)
     if (transcriptFiles.length === 0) return
+    
     setFiles(prev => {
       const existing = new Map(prev.map(f => [f.name, f]))
       for (const f of transcriptFiles) existing.set(f.name, f)
       return [...existing.values()]
     })
     await indexFiles(transcriptFiles, { chunkSize: settings.chunkSize })
-  }, [indexFiles])
+  }, [indexFiles, settings.chunkSize])
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) processFiles(e.target.files)
