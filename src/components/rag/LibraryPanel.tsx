@@ -1,7 +1,8 @@
-﻿'use client'
+'use client'
 
 import { useCallback, useRef, useState, useMemo, useEffect } from 'react'
 import { useIndex } from '@/hooks/useIndex'
+import { useSettings } from '@/hooks/useSettings'
 import { getAllFiles } from '@/lib/db'
 import type { TranscriptFile } from '@/types'
 import { FileText, FolderOpen, Loader2, CheckCircle2, AlertCircle, RefreshCw, Upload, Database, FileUp, Brain, BookTemplate, Trash2, Trash } from 'lucide-react'
@@ -10,6 +11,7 @@ export default function LibraryPanel() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
   const { state, indexFiles, deleteFile, resetIndex } = useIndex()
+  const { settings } = useSettings()
   const [files, setFiles] = useState<TranscriptFile[]>([])
   const [deleting, setDeleting] = useState<string | null>(null)
 
@@ -42,7 +44,7 @@ export default function LibraryPanel() {
       for (const f of transcriptFiles) existing.set(f.name, f)
       return [...existing.values()]
     })
-    await indexFiles(transcriptFiles)
+    await indexFiles(transcriptFiles, { chunkSize: settings.chunkSize })
   }, [indexFiles])
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

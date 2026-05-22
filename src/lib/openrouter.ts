@@ -18,9 +18,14 @@ export interface LLMResponse {
 export async function queryLLM(
   prompt: string,
   apiKey: string,
-  options?: { onModelTry?: (model: string) => void; signal?: AbortSignal }
+  options?: { preferredModel?: string; onModelTry?: (model: string) => void; signal?: AbortSignal }
 ): Promise<LLMResponse> {
-  for (const model of FREE_MODELS) {
+  const preferred = options?.preferredModel
+  const modelsToTry = preferred
+    ? [preferred, ...FREE_MODELS.filter(m => m !== preferred)]
+    : FREE_MODELS
+
+  for (const model of modelsToTry) {
     const t = performance.now()
     try {
       options?.onModelTry?.(model)

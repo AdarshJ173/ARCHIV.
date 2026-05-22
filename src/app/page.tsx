@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useCallback } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
@@ -73,7 +73,10 @@ export default function Home() {
     }
     addMessage(userMsg)
     const attachedFiles = session.attachedFiles
-    const assistantMsg = await search(question, settings.openrouterKey, attachedFiles)
+    const assistantMsg = await search(question, settings.openrouterKey, attachedFiles, {
+      model: settings.model,
+      topK: settings.topK,
+    })
     if (assistantMsg) addMessage(assistantMsg)
   }, [sessions, activeId, settings, addMessage, search, openContextDialogForSession])
 
@@ -123,7 +126,7 @@ export default function Home() {
           open={!!contextDialogTarget}
           currentlyAttached={sessions.find(s => s.id === contextDialogTarget)?.attachedFiles || []}
           onConfirm={handleContextConfirm}
-          onIndexNewFiles={indexFiles}
+          onIndexNewFiles={(files) => indexFiles(files, { chunkSize: settings.chunkSize })}
           onClose={() => setContextDialogTarget(null)}
         />
       )}

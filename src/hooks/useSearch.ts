@@ -21,7 +21,12 @@ export function useSearch() {
     requestCount: 0,
   })
 
-  const search = useCallback(async (question: string, apiKey: string, attachedFiles?: string[]): Promise<ChatMessage | null> => {
+  const search = useCallback(async (
+    question: string,
+    apiKey: string,
+    attachedFiles?: string[],
+    options?: { model?: string; topK?: number }
+  ): Promise<ChatMessage | null> => {
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
@@ -96,6 +101,7 @@ export function useSearch() {
               chunks: chunks.map(c => ({ id: c.id, text: c.text, source: c.source })),
               query: question,
               bm25Terms: bm25Terms.map(t => ({ term: t.term, docFreqs: t.docFreqs })),
+              topK: options?.topK,
             })
           }
         }
@@ -131,7 +137,10 @@ export function useSearch() {
       console.log(`[WebRAG] Step 6/6: Querying OpenRouter LLM...`)
 
       const { answer, model, promptTokens, completionTokens, totalTokens } = await queryLLM(
-        prompt, apiKey, { signal: controller.signal }
+        prompt, apiKey, {
+          preferredModel: options?.model,
+          signal: controller.signal,
+        }
       )
 
       if (totalTokens) {

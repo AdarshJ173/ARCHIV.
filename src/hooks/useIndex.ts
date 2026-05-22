@@ -13,7 +13,7 @@ export function useIndex() {
     message: '',
   })
 
-  const indexFiles = useCallback(async (files: TranscriptFile[]) => {
+  const indexFiles = useCallback(async (files: TranscriptFile[], options?: { chunkSize?: number }) => {
     const tStart = performance.now()
     console.log(`[WebRAG] ==============================`)
     console.log(`[WebRAG] INDEXING STARTED: ${files.length} files`)
@@ -29,7 +29,7 @@ export function useIndex() {
     console.log(`[WebRAG] Step 2/5: Chunking files... (10%)`)
     setState(prev => ({ ...prev, progress: 10, message: 'Chunking files...' }))
     const chunkInputs = files.map(f => ({ id: f.id, text: f.text, fileName: f.name }))
-    const chunks = chunkFiles(chunkInputs)
+    const chunks = chunkFiles(chunkInputs, { maxTokens: options?.chunkSize })
     await saveChunks(chunks)
     console.log(`[WebRAG] Step 2/5: Complete - ${chunks.length} chunks [+${(performance.now()-t).toFixed(0)}ms] [total: ${(performance.now()-tStart).toFixed(0)}ms]`)
 

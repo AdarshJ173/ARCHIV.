@@ -80,12 +80,17 @@ export function sentenceChunks(
   return chunks
 }
 
-export function chunkFiles(files: ChunkInput[]): ChunkOutput[] {
+export function chunkFiles(
+  files: ChunkInput[],
+  options?: { maxTokens?: number; overlapTokens?: number }
+): ChunkOutput[] {
+  const maxTokens = options?.maxTokens ?? 512
+  const overlapTokens = options?.overlapTokens ?? Math.round(maxTokens * 0.2)
   const tStart = performance.now()
   const results: ChunkOutput[] = []
   for (const file of files) {
     const t = performance.now()
-    const chunks = sentenceChunks(file.text)
+    const chunks = sentenceChunks(file.text, maxTokens, overlapTokens)
     console.log(`[WebRAG:Chunker] "${file.fileName}": ${chunks.length} chunks from ${file.text.length} chars [${(performance.now()-t).toFixed(0)}ms]`)
     for (let idx = 0; idx < chunks.length; idx++) {
       results.push({

@@ -1,18 +1,13 @@
 import { cosineSimilarity, rrf } from '@/lib/vector-search'
 import { bm25Search } from '@/lib/bm25'
 
-const VECTOR_TOP_K = 30
-const BM25_TOP_K = 30
-const FUSED_TOP_K = 30
-const RERANKED_TOP_K = 10
-const RRF_K = 60
-
 interface SearchInput {
   queryVec: number[]
   vectors: Array<{ id: string; embedding: number[] }>
   chunks: Array<{ id: string; text: string; source: string }>
   query: string
   bm25Terms: Array<{ term: string; docFreqs: Record<string, number> }>
+  topK?: number
 }
 
 interface RerankInput {
@@ -37,10 +32,16 @@ self.onmessage = async (e: MessageEvent<SearchInput | RerankInput>) => {
     return
   }
 
-  const { queryVec, vectors, chunks, query, bm25Terms } = data as SearchInput
+  const { queryVec, vectors, chunks, query, bm25Terms, topK = 5 } = data as SearchInput
   const tStart = performance.now()
 
-  console.log(`[WebRAG:Worker] Search pipeline: ${vectors.length} vectors, ${chunks.length} chunks, ${bm25Terms.length} terms`)
+  const RERANKED_TOP_K = topK
+  const VECTOR_TOP_K = Math.max(topK * 3, 30)
+  const BM25_TOP_K = Math.max(topK * 3, 30)
+  const FUSED_TOP_K = Math.max(topK * 3, 30)
+  const RRF_K = 60
+
+  console.log(`[WebRAG:Worker] Search pipeline: ${vectors.length} vectors, ${chunks.length} chunks, ${bm25Terms.length} terms, topK: ${topK}`)
 
   const queryFloat = new Float32Array(queryVec)
 
