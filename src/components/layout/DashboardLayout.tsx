@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { type ReactNode, useState, useEffect } from 'react'
 import Header from './Header'
@@ -20,15 +20,6 @@ interface Props {
   onSettingsClose: () => void
 }
 
-function getInitialTheme(): 'light' | 'dark' {
-  if (typeof window === 'undefined') return 'light'
-  const stored = localStorage.getItem('archiv-theme')
-  if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-    return 'dark'
-  }
-  return 'light'
-}
-
 export default function DashboardLayout({
   children,
   activePanel,
@@ -42,7 +33,16 @@ export default function DashboardLayout({
   onSettingsOpen,
   onSettingsClose,
 }: Props) {
-  const [theme, setTheme] = useState<'light' | 'dark'>(getInitialTheme)
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+
+  useEffect(() => {
+    const stored = localStorage.getItem('archiv-theme')
+    if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      setTheme('dark')
+    } else {
+      setTheme('light')
+    }
+  }, [])
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
