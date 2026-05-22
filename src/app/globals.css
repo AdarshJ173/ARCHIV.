@@ -215,6 +215,12 @@
   color: var(--accent-rust);
 }
 
+.wordmark-logo {
+  height: 28px;
+  width: auto;
+  display: block;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;

@@ -23,8 +23,22 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ARCHIV — Transcript Intelligence",
+  title: "ARCHIV. — Transcript Intelligence",
   description: "Download YouTube transcripts, build a local knowledge library, and chat with your documents using in-browser AI.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://archiv.vercel.app"),
+  icons: [{ rel: "icon", url: "/favicon.svg", type: "image/svg+xml" }],
+  openGraph: {
+    title: "ARCHIV. — Transcript Intelligence",
+    description: "Download YouTube transcripts, build a local knowledge library, and chat with your documents using in-browser AI.",
+    type: "website",
+    images: [{ url: "/og-image.png", width: 1254, height: 1254, alt: "ARCHIV. logo" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ARCHIV. — Transcript Intelligence",
+    description: "Download YouTube transcripts, build a local knowledge library, and chat with your documents using in-browser AI.",
+    images: ["/og-image.png"],
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

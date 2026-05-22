@@ -9,6 +9,10 @@
 ```
 
 <p align="center">
+  <img src="./public/logo.svg" alt="ARCHIV. logo" width="120">
+</p>
+
+<p align="center">
   <b>Talk to your transcripts. Privately. Offline. Free.</b>
 </p>
 

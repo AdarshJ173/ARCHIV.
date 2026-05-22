@@ -56,9 +56,7 @@ export default function Header({ onSettingsOpen, theme, onThemeToggle }: Props) 
   return (
     <header className="header">
       <div className="flex items-center gap-4">
-        <span className="wordmark">
-          ARCHIV<span className="wordmark-accent">.</span>
-        </span>
+        <img src="/logo.svg" alt="ARCHIV." className="wordmark-logo" />
         <span className="status-pill">
           <span className="status-dot" />
           All Local
