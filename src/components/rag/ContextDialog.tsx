@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { getAllFiles } from '@/lib/db'
 import type { TranscriptFile } from '@/types'
 import { FileText, Upload, X, CheckCircle2, Loader2, FolderOpen, FileUp, AlertCircle } from 'lucide-react'
+import { getFilesFromDragEvent, isValidFile, extractTextFromFile, runWithConcurrencyLimit } from '../../lib/upload'
 
 interface Props {
   open: boolean
@@ -20,6 +21,14 @@ export default function ContextDialog({ open, currentlyAttached, onConfirm, onIn
   const [loading, setLoading] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
+
+  // Imperatively set directory attributes on mount to ensure folder selection works flawlessly
+  useEffect(() => {
+    if (folderInputRef.current) {
+      folderInputRef.current.setAttribute('webkitdirectory', '')
+      folderInputRef.current.setAttribute('directory', '')
+    }
+  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -59,25 +68,30 @@ export default function ContextDialog({ open, currentlyAttached, onConfirm, onIn
     })
   }, [indexedFiles])
 
-  const handleNewFiles = useCallback((fileList: FileList) => {
-    const valid = Array.from(fileList).filter(f => f && /\.(txt|md)$/i.test(f.name))
+  const handleNewFiles = useCallback((fileList: FileList | File[]) => {
+    const valid = Array.from(fileList).filter(f => f && isValidFile(f))
     setNewFiles(prev => {
-      const map = new Map(prev.map(f => [f.name, f]))
-      for (const f of valid) map.set(f.name, f)
+      const map = new Map(prev.map(f => [f.webkitRelativePath || f.name, f]))
+      for (const f of valid) map.set(f.webkitRelativePath || f.name, f)
       return [...map.values()]
     })
   }, [])
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault()
-    if (e.dataTransfer.files) handleNewFiles(e.dataTransfer.files)
+    try {
+      const files = await getFilesFromDragEvent(e)
+      handleNewFiles(files)
+    } catch (err) {
+      console.error('[WebRAG] Failed to parse dropped items:', err)
+    }
   }, [handleNewFiles])
 
   const handleBrowse = useCallback(() => fileInputRef.current?.click(), [])
   const handleFolder = useCallback(() => folderInputRef.current?.click(), [])
 
   const removeNewFile = useCallback((name: string) => {
-    setNewFiles(prev => prev.filter(f => f.name !== name))
+    setNewFiles(prev => prev.filter(f => (f.webkitRelativePath || f.name) !== name))
   }, [])
 
   const [indexingNew, setIndexingNew] = useState(false)
@@ -88,22 +102,27 @@ export default function ContextDialog({ open, currentlyAttached, onConfirm, onIn
     const allFileNames = new Set(selected)
 
     const newProcessed: TranscriptFile[] = []
-    const tasks = newFiles.map(async (f, idx) => {
+    const total = newFiles.length
+    await runWithConcurrencyLimit(newFiles, async (f, idx) => {
       try {
-        const text = await f.text()
+        const tFile = performance.now()
+        const relativeName = f.webkitRelativePath || f.name
+        console.log(`[WebRAG:Parser] [${idx + 1}/${total}] Extracting: ${relativeName} (${(f.size / 1024).toFixed(1)} KB)...`)
+        
+        const text = await extractTextFromFile(f)
         newProcessed.push({
           id: `ctx_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 8)}`,
-          name: f.name,
+          name: relativeName,
           text,
           size: f.size,
           uploadedAt: Date.now(),
         })
-        allFileNames.add(f.name)
+        allFileNames.add(relativeName)
+        console.log(`[WebRAG:Parser] [${idx + 1}/${total}] Success: ${relativeName} parsed in ${(performance.now() - tFile).toFixed(0)}ms`)
       } catch (err) {
-        console.warn(`[WebRAG] Failed to read context file ${f.name}:`, err)
+        console.warn(`[WebRAG:Parser] [${idx + 1}/${total}] Failed to read: ${f.webkitRelativePath || f.name}:`, err)
       }
-    })
-    await Promise.all(tasks)
+    }, 1)
 
     if (allFileNames.size === 0) return
 
@@ -235,22 +254,21 @@ export default function ContextDialog({ open, currentlyAttached, onConfirm, onIn
               style={{ cursor: 'pointer' }}
             >
               <Upload className="dropzone-icon" />
-              <div className="dropzone-text">Drop transcript files here</div>
-              <div className="dropzone-hint">or click to browse &middot; .txt, .md supported</div>
+              <div className="dropzone-text">Drop files here</div>
+              <div className="dropzone-hint">or click to browse &middot; PDF, DOCX, TXT, MD supported</div>
             </div>
 
             <input
               ref={fileInputRef}
               type="file"
               multiple
-              accept=".txt,.md"
+              accept=".txt,.md,.pdf,.docx,.text,.markdown,.json,.js,.ts,.py,.csv,.html,.css,.log"
               className="hidden"
               onChange={(e) => { if (e.target.files) handleNewFiles(e.target.files); e.target.value = '' }}
             />
             <input
               ref={folderInputRef}
               type="file"
-              {...{ webkitdirectory: '', directory: '' } as React.InputHTMLAttributes<HTMLInputElement>}
               multiple
               className="hidden"
               onChange={(e) => { if (e.target.files) handleNewFiles(e.target.files); e.target.value = '' }}
@@ -269,22 +287,25 @@ export default function ContextDialog({ open, currentlyAttached, onConfirm, onIn
 
             {newFiles.length > 0 && (
               <div style={{ border: '1px solid var(--border)', borderRadius: '4px', maxHeight: '150px', overflowY: 'auto' }}>
-                {newFiles.map(f => (
-                  <div key={f.name} className="video-row">
-                    <FileText className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--muted-foreground)', marginRight: '8px' }} />
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div className="video-row-title">{f.name}</div>
-                      <div className="video-row-date">{(f.size / 1024).toFixed(1)} KB</div>
+                {newFiles.map(f => {
+                  const displayName = f.webkitRelativePath || f.name
+                  return (
+                    <div key={displayName} className="video-row">
+                      <FileText className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--muted-foreground)', marginRight: '8px' }} />
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div className="video-row-title">{displayName}</div>
+                        <div className="video-row-date">{(f.size / 1024).toFixed(1)} KB</div>
+                      </div>
+                      <button
+                        className="trash-btn"
+                        onClick={(e) => { e.stopPropagation(); removeNewFile(displayName) }}
+                        style={{ flexShrink: 0 }}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
                     </div>
-                    <button
-                      className="trash-btn"
-                      onClick={(e) => { e.stopPropagation(); removeNewFile(f.name) }}
-                      style={{ flexShrink: 0 }}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>

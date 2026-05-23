@@ -6,6 +6,7 @@ import { useSettings } from '@/hooks/useSettings'
 import { getAllFiles } from '@/lib/db'
 import type { TranscriptFile } from '@/types'
 import { FileText, FolderOpen, Loader2, CheckCircle2, AlertCircle, RefreshCw, Upload, Database, FileUp, Brain, BookTemplate, Trash2, Trash } from 'lucide-react'
+import { getFilesFromDragEvent, isValidFile, extractTextFromFile, runWithConcurrencyLimit } from '../../lib/upload'
 
 export default function LibraryPanel() {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -15,6 +16,14 @@ export default function LibraryPanel() {
   const [files, setFiles] = useState<TranscriptFile[]>([])
   const [deleting, setDeleting] = useState<string | null>(null)
 
+  // Imperatively set directory attributes on mount to ensure folder selection works flawlessly
+  useEffect(() => {
+    if (folderInputRef.current) {
+      folderInputRef.current.setAttribute('webkitdirectory', '')
+      folderInputRef.current.setAttribute('directory', '')
+    }
+  }, [])
+
   const loadFiles = useCallback(async () => {
     const indexed = await getAllFiles()
     setFiles(indexed)
@@ -22,30 +31,32 @@ export default function LibraryPanel() {
 
   useEffect(() => { const t = setTimeout(() => loadFiles(), 0); return () => clearTimeout(t) }, [loadFiles])
 
-  const processFiles = useCallback(async (fileList: FileList) => {
+  const processFiles = useCallback(async (fileList: FileList | File[]) => {
     console.log(`[WebRAG] processFiles: Received ${fileList.length} files`)
     const transcriptFiles: TranscriptFile[] = []
     const total = fileList.length
     
-    const tasks = Array.from(fileList).map(async (file, i) => {
+    await runWithConcurrencyLimit(Array.from(fileList), async (file, i) => {
       if (!file) return
-      if (/\.(txt|md|text|markdown)$/i.test(file.name)) {
+      if (isValidFile(file)) {
+        const tFile = performance.now()
+        const relativeName = file.webkitRelativePath || file.name
+        console.log(`[WebRAG:Parser] [${i + 1}/${total}] Extracting: ${relativeName} (${(file.size / 1024).toFixed(1)} KB)...`)
         try {
-          const text = await file.text()
+          const text = await extractTextFromFile(file)
           transcriptFiles.push({
             id: `file_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}`,
-            name: file.webkitRelativePath || file.name,
+            name: relativeName,
             text,
             size: file.size,
             uploadedAt: Date.now(),
           })
+          console.log(`[WebRAG:Parser] [${i + 1}/${total}] Success: ${relativeName} parsed in ${(performance.now() - tFile).toFixed(0)}ms`)
         } catch (err) {
-          console.warn(`[WebRAG] Failed to read file ${file.name}:`, err)
+          console.warn(`[WebRAG:Parser] [${i + 1}/${total}] Failed to read: ${relativeName}:`, err)
         }
       }
-    })
-    
-    await Promise.all(tasks)
+    }, 1)
     
     console.log(`[WebRAG] processFiles: Successfully read ${transcriptFiles.length} valid files`)
     if (transcriptFiles.length === 0) return
@@ -130,24 +141,31 @@ export default function LibraryPanel() {
           className="dropzone"
           onClick={() => fileInputRef.current?.click()}
           onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files) processFiles(e.dataTransfer.files) }}
+          onDrop={async (e) => {
+            e.preventDefault()
+            try {
+              const files = await getFilesFromDragEvent(e)
+              processFiles(files)
+            } catch (err) {
+              console.error('[WebRAG] Failed to parse dropped items:', err)
+            }
+          }}
         >
           <Upload className="dropzone-icon" />
-          <div className="dropzone-text">Drop transcript files here</div>
-          <div className="dropzone-hint">or click to browse &middot; .txt, .md supported</div>
+          <div className="dropzone-text">Drop files here</div>
+          <div className="dropzone-hint">or click to browse &middot; PDF, DOCX, TXT, MD supported</div>
         </div>
         <input
           ref={fileInputRef}
           type="file"
           multiple
-          accept=".txt,.md"
+          accept=".txt,.md,.pdf,.docx,.text,.markdown,.json,.js,.ts,.py,.csv,.html,.css,.log"
           className="hidden"
           onChange={handleFileSelect}
         />
         <input
           ref={folderInputRef}
           type="file"
-          {...{ webkitdirectory: "", directory: "" } as React.InputHTMLAttributes<HTMLInputElement>}
           multiple
           className="hidden"
           onChange={handleFileSelect}

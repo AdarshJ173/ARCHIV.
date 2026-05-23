@@ -53,6 +53,7 @@ export function sentenceChunks(
         const end = Math.min(start + maxChars, oversized.length)
         const seg = oversized.slice(start, end).trim()
         if (seg.length >= minChunkChars) chunks.push(seg)
+        if (end >= oversized.length) break
         start = end - Math.floor(overlapTokens * 4)
         if (start < 0) start = 0
       }

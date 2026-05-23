@@ -17,96 +17,117 @@ export function useIndex() {
     const tStart = performance.now()
     console.log(`[WebRAG] ==============================`)
     console.log(`[WebRAG] INDEXING STARTED: ${files.length} files`)
-    console.log(`[WebRAG] Files:`, files.map(f => `${f.name} (${(f.size / 1024).toFixed(1)} KB)`).join(', '))
 
     const indexWorker = new Worker(new URL('@/workers/index.worker', import.meta.url))
+    const embedWorker = new Worker(new URL('@/workers/embed.worker', import.meta.url))
 
     try {
-      let t = performance.now()
-      console.log(`[WebRAG] Step 1/5: Saving files to IndexedDB (0%) [elapsed: 0ms]`)
-      setState({ status: 'indexing', totalFiles: files.length, totalChunks: 0, progress: 0, message: 'Saving files...' })
+      // Step 1: Save files to IndexedDB
+      setState({ status: 'indexing', totalFiles: files.length, totalChunks: 0, progress: 5, message: 'Saving files...' })
       await saveFiles(files)
-      console.log(`[WebRAG] Step 1/5: Complete - ${files.length} files saved [+${(performance.now()-t).toFixed(0)}ms]`)
 
-      t = performance.now()
-      console.log(`[WebRAG] Step 2/5: Chunking files in background worker... (10%)`)
-      setState(prev => ({ ...prev, progress: 10, message: 'Chunking files...' }))
-      const chunkInputs = files.map(f => ({ id: f.id, text: f.text, fileName: f.name }))
-      
-      const chunks = await new Promise<Chunk[]>((resolve, reject) => {
-        indexWorker.onmessage = (e) => {
-          const { type, chunks, error } = e.data
-          if (type === 'chunk-complete') {
-            resolve(chunks)
-          } else if (type === 'error') {
-            reject(new Error(error))
+      const allChunks: Chunk[] = []
+
+      // Setup embedWorker handlers that can be dynamically set per file
+      let currentEmbedResolve: ((val: any[]) => void) | null = null
+      let currentEmbedReject: ((err: Error) => void) | null = null
+      let currentEmbedProgress: ((current: number, total: number) => void) | null = null
+
+      embedWorker.onmessage = (e) => {
+        const data = e.data
+        if (data.type === 'model-download') {
+          console.log(`[WebRAG]   Model ${data.status === 'loading' ? '↓ downloading' : '✓ ready'} — ${data.model} (${data.dtype || 'default'})`)
+        } else if (data.type === 'progress') {
+          if (currentEmbedProgress) {
+            currentEmbedProgress(data.current, data.total)
+          }
+        } else if (data.type === 'complete') {
+          if (currentEmbedResolve) {
+            currentEmbedResolve(data.embeddings)
+          }
+        } else if (data.type === 'error') {
+          if (currentEmbedReject) {
+            currentEmbedReject(new Error(data.error))
           }
         }
-        indexWorker.onerror = (err) => {
-          reject(err)
-        }
-        indexWorker.postMessage({
-          type: 'chunk',
-          files: chunkInputs,
-          options: { maxTokens: options?.chunkSize }
+      }
+
+      // Sequentially process each document: chunk it, embed it, and save it!
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        const docPercent = Math.round((i / files.length) * 60) // Indexing documents maps to 5% - 65% overall progress
+        const overallProgress = 5 + docPercent
+
+        console.log(`[WebRAG:Pipeline] Processing document [${i + 1}/${files.length}]: ${file.name}...`)
+        setState(prev => ({
+          ...prev,
+          progress: overallProgress,
+          message: `Ingesting [${i + 1}/${files.length}]: ${file.name.split('/').pop()}...`
+        }))
+
+        // 1. Chunk this specific file in IndexWorker
+        const fileChunks = await new Promise<Chunk[]>((resolve, reject) => {
+          indexWorker.onmessage = (e) => {
+            const { type, chunks, error } = e.data
+            if (type === 'chunk-complete') {
+              resolve(chunks)
+            } else if (type === 'error') {
+              reject(new Error(error))
+            }
+          }
+          indexWorker.onerror = (err) => {
+            reject(err)
+          }
+          indexWorker.postMessage({
+            type: 'chunk',
+            files: [{ id: file.id, text: file.text, fileName: file.name }],
+            options: { maxTokens: options?.chunkSize }
+          })
         })
-      })
 
-      await saveChunks(chunks)
-      console.log(`[WebRAG] Step 2/5: Complete - ${chunks.length} chunks [+${(performance.now()-t).toFixed(0)}ms] [total: ${(performance.now()-tStart).toFixed(0)}ms]`)
+        if (fileChunks.length === 0) continue
 
-      setState(prev => ({ ...prev, totalChunks: chunks.length, progress: 15, message: 'Embedding chunks...' }))
+        // Save this file's chunks to IndexedDB
+        await saveChunks(fileChunks)
+        allChunks.push(...fileChunks)
 
-      t = performance.now()
-      console.log(`[WebRAG] Step 3/5: Starting embedding process (15%)`)
-      console.log(`[WebRAG]   Model: Xenova/bge-base-en-v1.5 (768-dim)`)
-      console.log(`[WebRAG]   Chunks: ${chunks.length}`)
-
-      const embedWorker = new Worker(new URL('@/workers/embed.worker', import.meta.url))
-
-      await new Promise<void>((resolve, reject) => {
-        embedWorker.onmessage = async (e) => {
-          const data = e.data
-          if (data.type === 'model-download') {
-            console.log(`[WebRAG]   Model ${data.status === 'loading' ? '↓ downloading' : '✓ ready'} — ${data.model} (${data.dtype || 'default'})`)
-          } else if (data.type === 'progress') {
-            const pct = Math.round((data.current / data.total) * 50)
-            const overall = 15 + pct
-            console.log(`[WebRAG]   Embedding: ${data.current}/${data.total} chunks (${Math.round(data.current/data.total*100)}%) [+${(performance.now()-t).toFixed(0)}ms] — Overall: ${overall}%`)
-            setState(prev => ({ ...prev, progress: overall, message: `Embedding ${data.current}/${data.total}...` }))
-          } else if (data.type === 'complete') {
-            console.log(`[WebRAG] Step 3/5: Embedding complete - ${data.embeddings.length} vectors [+${(performance.now()-t).toFixed(0)}ms] [total: ${(performance.now()-tStart).toFixed(0)}ms]`)
-            t = performance.now()
-            const vectors = data.embeddings.map((emb: { id: string; embedding: number[] }) => ({
-              id: emb.id,
-              embedding: new Float32Array(emb.embedding),
+        // 2. Embed this file's chunks in EmbedWorker
+        const embeddings = await new Promise<any[]>((resolve, reject) => {
+          currentEmbedResolve = resolve
+          currentEmbedReject = reject
+          currentEmbedProgress = (current, total) => {
+            const embedPercent = Math.round((current / total) * (60 / files.length))
+            setState(prev => ({
+              ...prev,
+              progress: overallProgress + embedPercent,
+              message: `Embedding [${i + 1}/${files.length}]: ${current}/${total} chunks...`
             }))
-            console.log(`[WebRAG]   Saving ${vectors.length} vectors to IndexedDB...`)
-            await saveVectors(vectors)
-            console.log(`[WebRAG]   Vectors saved [+${(performance.now()-t).toFixed(0)}ms]`)
-            embedWorker.terminate()
-            resolve()
-          } else if (data.type === 'error') {
-            console.error(`[WebRAG] Embedding worker error:`, data.error)
-            embedWorker.terminate()
-            reject(new Error(data.error))
           }
-        }
-        embedWorker.onerror = (err) => {
-          console.error(`[WebRAG] Embedding worker fatal error:`, err)
-          embedWorker.terminate()
-          reject(err)
-        }
-        embedWorker.postMessage({ chunks: chunks.map(c => ({ id: c.id, text: c.text })) })
-      })
 
-      t = performance.now()
-      console.log(`[WebRAG] Step 4/5: Building BM25 index in background worker (65%)`)
-      setState(prev => ({ ...prev, progress: 65, message: 'Building BM25 index...' }))
+          embedWorker.postMessage({ chunks: fileChunks.map(c => ({ id: c.id, text: c.text })) })
+        })
 
-      const allChunks = await getAllChunks()
-      console.log(`[WebRAG]   Tokenizing ${allChunks.length} chunks for BM25...`)
-      
+        const vectors = embeddings.map((emb: { id: string; embedding: number[] }) => ({
+          id: emb.id,
+          embedding: new Float32Array(emb.embedding),
+        }))
+
+        // Save this file's vectors to IndexedDB
+        await saveVectors(vectors)
+        
+        setState(prev => ({
+          ...prev,
+          totalChunks: allChunks.length,
+        }))
+      }
+
+      // Step 4: Build BM25 index on ALL chunks in IndexedDB
+      console.log(`[WebRAG] Step 4/5: Building BM25 index on all chunks...`)
+      setState(prev => ({ ...prev, progress: 75, message: 'Building BM25 index...' }))
+
+      const totalChunksDb = await getAllChunks()
+      console.log(`[WebRAG]   Tokenizing ${totalChunksDb.length} chunks for BM25...`)
+
       const terms = await new Promise<any[]>((resolve, reject) => {
         indexWorker.onmessage = (e) => {
           const { type, terms, error } = e.data
@@ -121,43 +142,37 @@ export function useIndex() {
         }
         indexWorker.postMessage({
           type: 'bm25',
-          chunks: allChunks.map(c => ({ id: c.id, text: c.text }))
+          chunks: totalChunksDb.map(c => ({ id: c.id, text: c.text }))
         })
       })
 
-      t = performance.now()
-      console.log(`[WebRAG]   Saving BM25 terms to IndexedDB...`)
       await saveBm25Terms(terms)
-      console.log(`[WebRAG]   BM25 terms saved [+${(performance.now()-t).toFixed(0)}ms]`)
-      console.log(`[WebRAG] Step 4/5: BM25 complete [total: ${(performance.now()-tStart).toFixed(0)}ms]`)
 
-      t = performance.now()
-      setState(prev => ({ ...prev, progress: 85, message: 'Saving metadata...' }))
-
+      // Step 5: Save metadata
+      setState(prev => ({ ...prev, progress: 90, message: 'Saving metadata...' }))
       await saveMetadata({
-        totalChunks: chunks.length,
+        totalChunks: totalChunksDb.length,
         totalFiles: files.length,
         embeddingDim: 768,
         modelName: 'BAAI/bge-base-en-v1.5',
         indexedAt: Date.now(),
       })
-      console.log(`[WebRAG]   Metadata saved [+${(performance.now()-t).toFixed(0)}ms]`)
 
       const totalTime = (performance.now() - tStart) / 1000
       console.log(`[WebRAG] ==============================`)
-      console.log(`[WebRAG] INDEXING COMPLETE: ${chunks.length} chunks from ${files.length} files`)
+      console.log(`[WebRAG] INDEXING COMPLETE: ${totalChunksDb.length} chunks from ${files.length} files`)
       console.log(`[WebRAG] ⏱ TOTAL TIME: ${totalTime.toFixed(1)}s`)
       console.log(`[WebRAG] ==============================`)
 
       setState({
         status: 'ready',
         totalFiles: files.length,
-        totalChunks: chunks.length,
+        totalChunks: totalChunksDb.length,
         progress: 100,
-        message: `Indexed ${chunks.length} chunks from ${files.length} files`,
+        message: `Indexed ${totalChunksDb.length} chunks from ${files.length} files`,
       })
     } catch (err) {
-      console.error(`[WebRAG] Indexing failed after ${((performance.now() - tStart)/1000).toFixed(1)}s:`, err)
+      console.error(`[WebRAG] Indexing failed:`, err)
       setState(prev => ({
         ...prev,
         status: 'error',
@@ -165,6 +180,7 @@ export function useIndex() {
       }))
     } finally {
       indexWorker.terminate()
+      embedWorker.terminate()
     }
   }, [])
 

@@ -52,6 +52,12 @@ export async function queryLLM(
       if (!response.ok) {
         const errText = await response.text().catch(() => 'Unknown error')
         console.warn(`[WebRAG:LLM] ${model} failed after ${elapsed.toFixed(0)}ms: ${response.status} ${errText}`)
+        if (response.status === 401) {
+          return {
+            answer: 'Your OpenRouter API Key is invalid or unauthorized (401). Please check/update your key in Settings.',
+            model,
+          }
+        }
         continue
       }
 
