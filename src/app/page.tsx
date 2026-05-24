@@ -22,7 +22,7 @@ export default function Home() {
   const {
     sessions, activeId, currentMessages,
     createNew, switchSession, deleteSession, addMessage,
-    setSessionContext,
+    updateLastAssistantMessage, setSessionContext,
   } = useSessions()
 
   const openContextDialogForSession = useCallback((sessionId: string) => {
@@ -56,15 +56,7 @@ export default function Home() {
       if (activeId) openContextDialogForSession(activeId)
       return
     }
-    if (!settings.openrouterKey) {
-      addMessage({
-        id: now.toString(),
-        role: 'assistant',
-        content: 'Please set your OpenRouter API key in settings first.',
-        timestamp: now,
-      })
-      return
-    }
+
     const userMsg = {
       id: (now + 1).toString(),
       role: 'user' as const,
@@ -72,13 +64,41 @@ export default function Home() {
       timestamp: now,
     }
     addMessage(userMsg)
-    const attachedFiles = session.attachedFiles
-    const assistantMsg = await search(question, settings.openrouterKey, attachedFiles, {
+
+    // Add empty assistant message that will be updated in real-time
+    const assistantMsgId = (now + 2).toString()
+    addMessage({
+      id: assistantMsgId,
+      role: 'assistant',
+      content: '',
+      sources: [],
       model: settings.model,
-      topK: settings.topK,
+      timestamp: now,
     })
-    if (assistantMsg) addMessage(assistantMsg)
-  }, [sessions, activeId, settings, addMessage, search, openContextDialogForSession])
+
+    const attachedFiles = session.attachedFiles
+    let accumulatedContent = ''
+    let currentSources: string[] = []
+
+    await search(
+      question,
+      settings.openrouterKey || '',
+      attachedFiles,
+      {
+        model: settings.model,
+        topK: settings.topK,
+        provider: settings.llmProvider
+      },
+      (token) => {
+        accumulatedContent += token
+        updateLastAssistantMessage(accumulatedContent, settings.model, currentSources)
+      },
+      (sources) => {
+        currentSources = sources
+        updateLastAssistantMessage(accumulatedContent, settings.model, currentSources)
+      }
+    )
+  }, [sessions, activeId, settings, addMessage, search, updateLastAssistantMessage, openContextDialogForSession])
 
   const attachedFileNames = sessions.find(s => s.id === activeId)?.attachedFiles || []
 

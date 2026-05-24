@@ -115,8 +115,11 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error: unknown) {
-    if (error instanceof Error && (error as any).status) {
-      return NextResponse.json({ success: false, error: error.message }, { status: (error as any).status })
+    if (error instanceof Error) {
+      const errWithStatus = error as Error & { status?: number }
+      if (errWithStatus.status) {
+        return NextResponse.json({ success: false, error: error.message }, { status: errWithStatus.status })
+      }
     }
     const message = error instanceof Error ? error.message : 'Unknown error'
     console.error('YouTube channel error:', message)

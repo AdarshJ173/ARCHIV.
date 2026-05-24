@@ -1,7 +1,7 @@
 import JSZip from 'jszip';
 
 // Cache the promise itself to completely resolve any race conditions in concurrent dynamic imports
-let pdfjsPromise: Promise<any> | null = null;
+let pdfjsPromise: Promise<any> | null = null; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 async function getPdfJS() {
   if (pdfjsPromise) return pdfjsPromise;
@@ -11,9 +11,9 @@ async function getPdfJS() {
     
     // Polyfill Promise.withResolvers if needed
     if (typeof Promise.withResolvers === 'undefined') {
-      (Promise as any).withResolvers = function() {
-        let resolve: any;
-        let reject: any;
+      (Promise as unknown as { withResolvers: unknown }).withResolvers = function() {
+        let resolve!: (value: unknown) => void;
+        let reject!: (reason?: unknown) => void;
         const promise = new Promise((res, rej) => {
           resolve = res;
           reject = rej;
@@ -74,7 +74,7 @@ export async function extractTextFromFile(file: File): Promise<string> {
   const name = file.name.toLowerCase();
   
   if (name.endsWith('.pdf')) {
-    let pdf: any = null;
+    let pdf: any = null; // eslint-disable-line @typescript-eslint/no-explicit-any
     try {
       const pdfjs = await getPdfJS();
       const arrayBuffer = await file.arrayBuffer();
@@ -89,7 +89,7 @@ export async function extractTextFromFile(file: File): Promise<string> {
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
-        const pageText = textContent.items.map((item: any) => item.str).join(' ');
+        const pageText = textContent.items.map((item: { str: string }) => item.str).join(' ');
         fullText += pageText + '\n';
       }
       return fullText;
@@ -145,7 +145,7 @@ export async function getFilesFromDragEvent(e: React.DragEvent): Promise<File[]>
 
   const files: File[] = [];
 
-  async function traverse(entry: any, path: string = ''): Promise<void> {
+  async function traverse(entry: any, path: string = ''): Promise<void> { // eslint-disable-line @typescript-eslint/no-explicit-any
     const currentPath = path ? `${path}/${entry.name}` : entry.name;
     if (entry.isFile) {
       if (!isValidFile(entry)) {
@@ -178,11 +178,11 @@ export async function getFilesFromDragEvent(e: React.DragEvent): Promise<File[]>
       const dirReader = entry.createReader();
       
       // Read all entries in the directory (handling webkitGetAsEntry/readEntries pagination)
-      const readEntries = async (): Promise<any[]> => {
-        const entries: any[] = [];
-        let batch: any[] = [];
+      const readEntries = async (): Promise<any[]> => { // eslint-disable-line @typescript-eslint/no-explicit-any
+        const entries: any[] = []; // eslint-disable-line @typescript-eslint/no-explicit-any
+        let batch: any[] = []; // eslint-disable-line @typescript-eslint/no-explicit-any
         do {
-          batch = await new Promise<any[]>((resolve, reject) => {
+          batch = await new Promise<any[]>((resolve, reject) => { // eslint-disable-line @typescript-eslint/no-explicit-any
             dirReader.readEntries(resolve, reject);
           });
           entries.push(...batch);

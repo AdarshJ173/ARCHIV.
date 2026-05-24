@@ -13,34 +13,10 @@ function loadSessions(): ChatSession[] {
   return []
 }
 
-function saveSessions(sessions: ChatSession[]) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions))
-  } catch {}
-}
-
 export function useSessions() {
-  const [sessions, setSessions] = useState<ChatSession[]>([])
+  const [sessions, setSessions] = useState<ChatSession[]>(() => loadSessions())
   const [activeId, setActiveId] = useState<string | null>(null)
   const initDone = useRef(false)
-
-  useEffect(() => {
-    if (initDone.current) return
-    initDone.current = true
-    const loaded = loadSessions()
-    setSessions(loaded)
-    if (loaded.length > 0) {
-      setActiveId(loaded[0].id)
-    } else {
-      createNew()
-    }
-  }, [])
-
-  useEffect(() => {
-    if (initDone.current) {
-      saveSessions(sessions)
-    }
-  }, [sessions])
 
   const activeSession = sessions.find(s => s.id === activeId) || null
   const currentMessages = activeSession?.messages || []
@@ -57,6 +33,27 @@ export function useSessions() {
     setSessions(prev => [session, ...prev])
     setActiveId(session.id)
   }, [sessions.length])
+
+  useEffect(() => {
+    if (initDone.current) return
+    initDone.current = true
+    if (sessions.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setActiveId(sessions[0].id)
+    } else {
+      createNew()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Save sessions to localStorage whenever they change
+  useEffect(() => {
+    if (initDone.current) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions))
+      } catch {}
+    }
+  }, [sessions])
 
   const setSessionContext = useCallback((sessionId: string, fileNames: string[]) => {
     setSessions(prev => prev.map(s =>
@@ -107,13 +104,13 @@ export function useSessions() {
     }))
   }, [activeId])
 
-  const updateLastAssistantMessage = useCallback((content: string, model?: string) => {
+  const updateLastAssistantMessage = useCallback((content: string, model?: string, sources?: string[]) => {
     setSessions(prev => prev.map(s => {
       if (s.id !== activeId) return s
       const msgs = [...s.messages]
       for (let i = msgs.length - 1; i >= 0; i--) {
         if (msgs[i].role === 'assistant') {
-          msgs[i] = { ...msgs[i], content, model }
+          msgs[i] = { ...msgs[i], content, model, sources: sources || msgs[i].sources }
           break
         }
       }

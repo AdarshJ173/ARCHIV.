@@ -1,8 +1,8 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect } from 'react'
 import type { ChatSession } from '@/types'
-import { getAllFiles } from '@/lib/db'
+import { getIndexedFiles } from '@/lib/api'
 import { Film, BookOpen, MessageSquare, Plus, Trash2 } from 'lucide-react'
 
 interface Props {
@@ -28,8 +28,25 @@ export default function Sidebar({
   const sortedSessions = [...sessions].sort((a, b) => b.updatedAt - a.updatedAt)
 
   useEffect(() => {
-    getAllFiles().then(files => setFileCount(files.length))
-  }, [sessions])
+    let active = true
+    const updateCount = () => {
+      getIndexedFiles()
+        .then(files => {
+          if (active) setFileCount(files.length)
+        })
+        .catch(() => {
+          if (active) setFileCount(0)
+        })
+    }
+
+    updateCount()
+    const interval = setInterval(updateCount, 3000)
+
+    return () => {
+      active = false
+      clearInterval(interval)
+    }
+  }, [sessions, activePanel])
 
   return (
     <aside className="sidebar">

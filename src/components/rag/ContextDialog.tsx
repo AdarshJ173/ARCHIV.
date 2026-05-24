@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { getAllFiles } from '@/lib/db'
+import { getIndexedFiles } from '@/lib/api'
 import type { TranscriptFile } from '@/types'
 import { FileText, Upload, X, CheckCircle2, Loader2, FolderOpen, FileUp, AlertCircle } from 'lucide-react'
 import { getFilesFromDragEvent, isValidFile, extractTextFromFile, runWithConcurrencyLimit } from '../../lib/upload'
@@ -34,9 +34,20 @@ export default function ContextDialog({ open, currentlyAttached, onConfirm, onIn
     if (!open) return
     const t1 = setTimeout(() => setLoading(true), 0)
     const t2 = setTimeout(() => setNewFiles([]), 0)
-    getAllFiles().then(files => {
-      setIndexedFiles(files)
+    getIndexedFiles().then(files => {
+      const mappedFiles: TranscriptFile[] = files.map(f => ({
+        id: f.id,
+        name: f.name,
+        text: '',
+        size: f.size,
+        uploadedAt: f.uploadedAt
+      }))
+      setIndexedFiles(mappedFiles)
       setSelected(new Set(currentlyAttached))
+      setLoading(false)
+    }).catch(err => {
+      console.warn('[WebRAG] Failed to fetch indexed files for context dialog:', err)
+      setIndexedFiles([])
       setLoading(false)
     })
     return () => { clearTimeout(t1); clearTimeout(t2) }

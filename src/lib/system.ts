@@ -21,7 +21,7 @@ export function getSystemSpecs(): SystemSpecs {
 
   if (typeof navigator !== 'undefined') {
     specs.cpuCores = navigator.hardwareConcurrency || 'Unknown'
-    specs.deviceMemory = (navigator as any).deviceMemory ? `${(navigator as any).deviceMemory} GB+` : 'Unknown'
+    specs.deviceMemory = 'deviceMemory' in navigator ? `${(navigator as Navigator & { deviceMemory?: number }).deviceMemory} GB+` : 'Unknown'
     specs.webgpuSupported = 'gpu' in navigator
   }
 
@@ -36,7 +36,6 @@ export function getSystemSpecs(): SystemSpecs {
           specs.gpuRenderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || 'Unknown'
 
           const renderer = specs.gpuRenderer.toLowerCase()
-          const vendor = specs.gpuVendor.toLowerCase()
 
           // Detect discrete GPU models
           if (
@@ -69,8 +68,8 @@ export function getSystemSpecs(): SystemSpecs {
           }
         }
       }
-    } catch (e) {
-      console.warn('[WebRAG] System diagnostics WebGL query skipped or failed:', e)
+    } catch (_e) {
+      console.warn('[WebRAG] System diagnostics WebGL query skipped or failed:', _e)
     }
   }
 

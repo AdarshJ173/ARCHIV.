@@ -225,7 +225,7 @@ async function fetchViaVideoPage(videoId: string): Promise<{ text: string; offse
     'ytInitialPlayerResponse = ',
   ]
 
-  let playerResponse: any = null
+  let playerResponse: any = null // eslint-disable-line @typescript-eslint/no-explicit-any
 
   for (const marker of startMarkers) {
     const idx = html.indexOf(marker)
@@ -249,7 +249,7 @@ async function fetchViaVideoPage(videoId: string): Promise<{ text: string; offse
           try {
             playerResponse = JSON.parse(rawJson)
             break
-          } catch (e) {
+          } catch {
             // Keep looping to search other markers or parse depths
           }
         }
@@ -314,7 +314,7 @@ async function fetchFromTimedTextApi(videoId: string): Promise<{ text: string; o
         const segments: { text: string; offset: number; duration: number }[] = []
         for (const ev of data.events) {
           if (!ev.segs || ev.segs.length === 0) continue
-          const text = ev.segs.map((s: any) => s.utf8 || '').join('').trim()
+          const text = ev.segs.map((s: { utf8?: string }) => s.utf8 || '').join('').trim()
           const decodedText = decodeXmlEntities(text)
           if (decodedText) {
             segments.push({

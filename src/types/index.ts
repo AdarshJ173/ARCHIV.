@@ -5,6 +5,14 @@ export interface TranscriptFile {
   size: number
   uploadedAt: number
 }
+export interface FileMetadata {
+  id: string
+  name: string
+  size: number
+  uploadedAt: number
+  chunksCount?: number
+}
+
 
 export interface Chunk {
   id: string

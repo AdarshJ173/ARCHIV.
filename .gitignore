@@ -45,3 +45,9 @@ __pycache__/
 cd
 cmd.exe
 npx
+
+# python
+.venv/
+
+# models (downloaded at runtime)
+data/models/

@@ -38,6 +38,7 @@ export default function DashboardLayout({
   useEffect(() => {
     const stored = localStorage.getItem('archiv-theme')
     if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTheme('dark')
     } else {
       setTheme('light')
